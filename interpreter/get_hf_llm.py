@@ -30,8 +30,28 @@ import os
 import shutil
 from huggingface_hub import list_files_info, hf_hub_download
 
+offline = False
 
-def get_hf_llm(repo_id, debug_mode, context_window):
+def get_hf_llm(repo_id, debug_mode, context_window, offline_mode):
+
+    if offline_mode:
+        global offline
+        offline = True
+        # get the local models instead
+        print("Offline mode enabled. Using local model.")
+        from llama_cpp import Llama
+        # get the appdirectories path and add on the selected model
+        user_data_dir = appdirs.user_data_dir("Open Interpreter")
+        default_path = os.path.join(user_data_dir, "models")
+        model_path = os.path.join(default_path, repo_id)
+        # replace \ with \\ for windows and add the .gguf extension
+        model_path = model_path.replace("\\", "\\\\")
+        model_path += ".gguf"
+        # print(Markdown(f"Model found at `{model_path}`"))
+
+        llama_2 = Llama(model_path=model_path,
+                        verbose=debug_mode, n_ctx=context_window)
+        return llama_2
 
     if "TheBloke/CodeLlama-" not in repo_id:
       # ^ This means it was prob through the old --local, so we have already displayed this message.
