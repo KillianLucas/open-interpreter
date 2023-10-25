@@ -1,8 +1,21 @@
 """
 This file defines the Interpreter class.
-It's the main file. `import interpreter` will import an instance of this class.
+running ```import interpreter``` followed by ```interpreter.create_interpreter(**kwargs)``` will create an instance of this class.
 """
-from interpreter.utils import display_markdown_message
+
+import json
+import appdirs
+import os
+from datetime import datetime
+from typing import (Optional,
+                     Union, 
+                     Iterator,
+                     Any,
+                     Callable,
+                     List,
+                     Dict
+                     )
+
 from ..cli.cli import cli
 from ..utils.get_config import get_config, user_config_path
 from ..utils.local_storage_path import get_storage_path
@@ -11,19 +24,16 @@ from ..llm.setup_llm import setup_llm
 from ..terminal_interface.terminal_interface import terminal_interface
 from ..terminal_interface.validate_llm_settings import validate_llm_settings
 from .generate_system_message import generate_system_message
-import appdirs
-import os
-from datetime import datetime
 from ..rag.get_relevant_procedures_string import get_relevant_procedures_string
-import json
 from ..utils.check_for_update import check_for_update
 from ..utils.display_markdown_message import display_markdown_message
+from ..code_interpreters.container_utils.build_image import build_docker_images
 from ..utils.embed import embed_function
 
 
+
+
 class Interpreter:
-    def cli(self):
-        cli(self)
 
     def __init__(self):
         # State
@@ -64,23 +74,36 @@ class Interpreter:
         # Number of procedures to add to the system message
         self.num_procedures = 2
 
+        # Container options
+        self.use_containers = False
+        self.session_id = None
+
         # Load config defaults
         self.extend_config(self.config_file)
+
+        
+        
 
         # Check for update
         if not self.local:
             # This should actually be pushed into the utility
             if check_for_update():
                 display_markdown_message("> **A new version of Open Interpreter is available.**\n>Please run: `pip install --upgrade open-interpreter`\n\n---")
+        
 
-    def extend_config(self, config_path):
+
+    def extend_config(self, config_path: str) -> None:
         if self.debug_mode:
             print(f'Extending configuration from `{config_path}`')
 
         config = get_config(config_path)
         self.__dict__.update(config)
 
-    def chat(self, message=None, display=True, stream=False):
+    def chat(self, message: Optional[str] = None, display: bool = True, stream: bool = False) -> Union[List[Dict[str, Any]], None]:
+
+        if self.use_containers:
+            build_docker_images() # Build images if needed. does nothing if already built
+
         if stream:
             return self._streaming_chat(message=message, display=display)
         
@@ -90,7 +113,7 @@ class Interpreter:
         
         return self.messages
     
-    def _streaming_chat(self, message=None, display=True):
+    def _streaming_chat(self, message: Optional[str] = None, display: bool = True) -> Iterator:
 
         # If we have a display,
         # we can validate our LLM settings w/ the user first
@@ -137,12 +160,12 @@ class Interpreter:
                     json.dump(self.messages, f)
                 
             return
-        raise Exception("`interpreter.chat()` requires a display. Set `display=True` or pass a message into `interpreter.chat(message)`.")
-
-    def _respond(self):
+        raise ValueError("`interpreter.chat()` requires a display. Set `interpreter.display=True` or pass a message into `interpreter.chat(message)`.")
+        
+    def _respond(self) -> Iterator:
         yield from respond(self)
             
-    def reset(self):
+    def reset(self) -> None:
         for code_interpreter in self._code_interpreters.values():
             code_interpreter.terminate()
         self._code_interpreters = {}
@@ -153,10 +176,13 @@ class Interpreter:
 
         self.__init__()
 
-
     # These functions are worth exposing to developers
     # I wish we could just dynamically expose all of our functions to devs...
-    def generate_system_message(self):
+    def generate_system_message(self) -> str:
         return generate_system_message(self)
-    def get_relevant_procedures_string(self):
+    
+    def get_relevant_procedures_string(self) -> str:
         return get_relevant_procedures_string(self)
+    
+    def container_callback(self, language: str) -> None:
+        self._code_interpreters.pop(language)

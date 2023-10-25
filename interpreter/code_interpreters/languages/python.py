@@ -6,15 +6,19 @@ import re
 import shlex
 
 class Python(SubprocessCodeInterpreter):
+
     file_extension = "py"
     proper_name = "Python"
 
-    def __init__(self):
-        super().__init__()
-        executable = sys.executable
-        if os.name != 'nt':  # not Windows
-            executable = shlex.quote(executable)
-        self.start_cmd = executable + " -i -q -u"
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        if 'use_containers' in kwargs and kwargs['use_containers']:
+            self.start_cmd = "python3 -i -q -u"
+        else:
+            executable = sys.executable
+            if os.name != 'nt':  # not Windows
+                executable = shlex.quote(executable)
+            self.start_cmd = executable + " -i -q -u"
         
     def preprocess_code(self, code):
         return preprocess_python(code)
@@ -53,7 +57,7 @@ def preprocess_python(code):
     code = "\n".join(code_lines)
 
     # Add end command (we'll be listening for this so we know when it ends)
-    code += '\n\nprint("## end_of_execution ##")'
+    code += '\n\nprint("## end_of_execution ##")\n'
 
     return code
 

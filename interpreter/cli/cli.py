@@ -8,6 +8,16 @@ import appdirs
 from ..utils.get_config import get_config_path
 from ..terminal_interface.conversation_navigator import conversation_navigator
 
+import sys
+import pysqlite3
+
+# Alias pysqlite3 as sqlite3 in sys.modules. this fixes a chromadb error where it whines about the wrong version being installed, but we cant change the containers sqlite.
+# 'pysqlite3' is a drop in replacement for default python sqlite3 lib. ( identical apis )
+sys.modules['sqlite3'] = pysqlite3
+
+
+
+
 arguments = [
     {
         "name": "system_message",
@@ -71,6 +81,13 @@ arguments = [
         "type": str,
     },
     {
+        "name": "use_containers",
+        "nickname": "uc",
+        "help_text": "optionally use a Docker Container for the interpreters code execution. this will seperate execution from your main computer. this also allows execution on a remote server via the 'DOCKER_HOST' environment variable and the dockerengine api.",
+        "type": bool
+    },
+    {
+
         "name": "safe_mode",
         "nickname": "safe",
         "help_text": "optionally enable safety mechanisms like code scanning; valid options are off, ask, and auto",
@@ -91,9 +108,10 @@ arguments = [
     },
 ]
 
-
-def cli(interpreter):
+def cli():
     parser = argparse.ArgumentParser(description="Open Interpreter")
+
+    from ..core.core import Interpreter
 
     # Add arguments
     for arg in arguments:
@@ -157,6 +175,8 @@ def cli(interpreter):
     # parser.add_argument('--models', dest='models', action='store_true', help='list avaliable models')
 
     args = parser.parse_args()
+
+    interpreter = Interpreter()
 
     # This should be pushed into an open_config.py util
     # If --config is used, open the config.yaml file in the Open Interpreter folder of the user's config dir

@@ -3,12 +3,12 @@ from ..subprocess_code_interpreter import SubprocessCodeInterpreter
 import os
 
 class Shell(SubprocessCodeInterpreter):
+     
     file_extension = "sh"
     proper_name = "Shell"
 
-    def __init__(self):
-        super().__init__()
-
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         # Determine the start command based on the platform
         if platform.system() == 'Windows':
             self.start_cmd = 'cmd.exe'
@@ -55,3 +55,14 @@ def add_active_line_prints(code):
         # Insert the echo command before the actual line
         lines[index] = f'echo "## active_line {index + 1} ##"\n{line}'
     return '\n'.join(lines)
+
+
+def wrap_in_trap(code):
+    """
+    Wrap Bash code with a trap to catch errors and display them.
+    """
+    trap_code = """
+    trap 'echo "An error occurred on line $LINENO"; exit' ERR
+    set -E
+    """
+    return trap_code + code

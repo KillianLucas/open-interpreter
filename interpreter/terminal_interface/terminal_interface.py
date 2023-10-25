@@ -10,7 +10,6 @@ from ..utils.display_markdown_message import display_markdown_message
 from ..utils.truncate_output import truncate_output
 from ..utils.scan_code import scan_code
 
-
 def terminal_interface(interpreter, message):
     if not interpreter.auto_run:
         interpreter_intro_message = [
@@ -173,3 +172,5 @@ def terminal_interface(interpreter, message):
                 continue
             else:
                 break
+
+                

@@ -114,7 +114,11 @@ def respond(interpreter):
                 # Get a code interpreter to run it
                 language = interpreter.messages[-1]["language"]
                 if language not in interpreter._code_interpreters:
-                    interpreter._code_interpreters[language] = create_code_interpreter(language)
+                    if interpreter.use_containers:
+                        interpreter._code_interpreters[language] = create_code_interpreter(interpreter, language, use_containers=True)
+                    else:
+                        interpreter._code_interpreters[language] = create_code_interpreter(interpreter, language, use_containers=False)
+                        
                 code_interpreter = interpreter._code_interpreters[language]
 
                 # Yield a message, such that the user can stop code execution if they want to
@@ -127,7 +131,13 @@ def respond(interpreter):
 
                 # Yield each line, also append it to last messages' output
                 interpreter.messages[-1]["output"] = ""
-                for line in code_interpreter.run(code):
+
+                code_to_run = code
+
+                if not code_to_run.endswith("\n"):
+                    code_to_run += "\n"
+                    
+                for line in code_interpreter.run(code_to_run):
                     yield line
                     if "output" in line:
                         output = interpreter.messages[-1]["output"]

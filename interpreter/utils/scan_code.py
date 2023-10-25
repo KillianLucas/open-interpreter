@@ -63,7 +63,7 @@ def scan_code(code, language, interpreter):
         if scan.returncode == 0:
             language_name = get_language_proper_name(language)
             print(
-                f"  {'Code Scaner: ' if interpreter.safe_mode == 'auto' else ''}No issues were found in this {language_name} code."
+                f"  {'Code Scaner: ' if interpreter.safe_mode == 'auto' else ''} No issues were found in this {language_name} code."
             )
             print("")
 

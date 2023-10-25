@@ -25,10 +25,18 @@ wget = "^3.2"
 huggingface-hub = "^0.17.3"
 litellm = "0.8.6"
 pyyaml = "^6.0.1"
+docker = "^6.1.3"
+semgrep = "^1.41.0"
 yaspin = "^3.0.1"
+pyqt5-qt5 = "5.15.2"
+pyqt5 = "5.15.10"
 ooba = "^0.0.21"
 chroma = "^0.2.0"
 chromadb = "^0.4.14"
+pysqlite3-binary = "^0.5.2.post1"
+[tool.poetry.dependencies.pyreadline3]
+version = "^3.4.1"
+markers = "sys_platform == 'win32'"
 
 # DISABLED # but perhaps we should re-enable soon. Windows + readline errors sometimes, need more testing
 # On non-windows systems, you can just `import readline`.
