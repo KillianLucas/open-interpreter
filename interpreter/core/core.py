@@ -12,6 +12,11 @@ import appdirs
 from interpreter.utils import display_markdown_message
 
 from ..cli.cli import cli
+from ..code_interpreters.code_function_handler import code_function
+from ..llm.setup_openai_coding_llm import function_schema
+from ..utils.get_config import get_config, user_config_path
+from ..utils.local_storage_path import get_storage_path
+from .respond import respond
 from ..llm.setup_llm import setup_llm
 from ..rag.get_relevant_procedures_string import get_relevant_procedures_string
 from ..terminal_interface.terminal_interface import terminal_interface
@@ -59,6 +64,9 @@ class Interpreter:
         self.max_budget = None
         self._llm = None
         self.gguf_quality = None
+        self.functions_schemas = [function_schema]
+        self.functions = [code_function]
+        #self.build_relevant_procedures_function = build_relevant_procedures
 
         # Procedures / RAG
         self.procedures = None

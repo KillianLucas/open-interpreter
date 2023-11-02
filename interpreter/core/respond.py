@@ -1,13 +1,8 @@
-import traceback
-
-import litellm
-
-from ..code_interpreters.create_code_interpreter import create_code_interpreter
-from ..code_interpreters.language_map import language_map
-from ..utils.display_markdown_message import display_markdown_message
+from ..code_interpreters.base_code_interpreter import BreakLoop
 from ..utils.merge_deltas import merge_deltas
-from ..utils.truncate_output import truncate_output
-
+from ..utils.display_markdown_message import display_markdown_message
+import traceback
+import litellm
 
 def respond(interpreter):
     """
@@ -96,75 +91,22 @@ def respond(interpreter):
             else:
                 raise
 
-        ### RUN CODE (if it's there) ###
+        executed = False
+        try:
+            for func in interpreter.functions:
+                did_execute = False
+                for result in func(interpreter):
+                    did_execute = True
+                    yield result
 
-        if "code" in interpreter.messages[-1]:
-            if interpreter.debug_mode:
-                print("Running code:", interpreter.messages[-1])
-
-            try:
-                # What code do you want to run?
-                code = interpreter.messages[-1]["code"]
-
-                # Fix a common error where the LLM thinks it's in a Jupyter notebook
-                if interpreter.messages[-1]["language"] == "python" and code.startswith(
-                    "!"
-                ):
-                    code = code[1:]
-                    interpreter.messages[-1]["code"] = code
-                    interpreter.messages[-1]["language"] = "shell"
-
-                # Get a code interpreter to run it
-                language = interpreter.messages[-1]["language"]
-                if language in language_map:
-                    if language not in interpreter._code_interpreters:
-                        interpreter._code_interpreters[
-                            language
-                        ] = create_code_interpreter(language)
-                    code_interpreter = interpreter._code_interpreters[language]
-                else:
-                    # This still prints the code but don't allow code to run. Let's Open-Interpreter know through output message
-                    error_output = f"Error: Open Interpreter does not currently support {language}."
-                    print(error_output)
-
-                    interpreter.messages[-1]["output"] = ""
-                    output = "\n" + error_output
-
-                    # Truncate output
-                    output = truncate_output(output, interpreter.max_output)
-                    interpreter.messages[-1]["output"] = output.strip()
+                if did_execute:
+                    executed = True
                     break
 
-                # Yield a message, such that the user can stop code execution if they want to
-                try:
-                    yield {"executing": {"code": code, "language": language}}
-                except GeneratorExit:
-                    # The user might exit here.
-                    # We need to tell python what we (the generator) should do if they exit
-                    break
+            if not executed:
+                break
 
-                # Yield each line, also append it to last messages' output
-                interpreter.messages[-1]["output"] = ""
-                for line in code_interpreter.run(code):
-                    yield line
-                    if "output" in line:
-                        output = interpreter.messages[-1]["output"]
-                        output += "\n" + line["output"]
-
-                        # Truncate output
-                        output = truncate_output(output, interpreter.max_output)
-
-                        interpreter.messages[-1]["output"] = output.strip()
-
-            except:
-                output = traceback.format_exc()
-                yield {"output": output.strip()}
-                interpreter.messages[-1]["output"] = output.strip()
-
-            yield {"end_of_execution": True}
-
-        else:
-            # Doesn't want to run code. We're done
+        except BreakLoop:
             break
 
     return

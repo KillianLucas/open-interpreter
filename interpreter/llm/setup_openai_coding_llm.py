@@ -32,6 +32,15 @@ function_schema = {
 }
 
 
+
+# Define a helper function to validate arguments based on the schema
+def validate_arguments(arguments, schema):
+    required_args = schema["parameters"]["required"]
+    if all(key in arguments and arguments[key] for key in required_args):
+        return True
+    return False
+
+
 def setup_openai_coding_llm(interpreter):
     """
     Takes an Interpreter (which includes a ton of LLM settings),
@@ -45,7 +54,7 @@ def setup_openai_coding_llm(interpreter):
         # Add OpenAI's recommended function message
         messages[0][
             "content"
-        ] += "\n\nOnly use the function you have been provided with."
+        ] += "\n\nOnly use the functions you have been provided with."
 
         # Seperate out the system_message from messages
         # (We expect the first message to always be a system_message)
@@ -82,10 +91,10 @@ def setup_openai_coding_llm(interpreter):
 
         # Create LiteLLM generator
         params = {
-            "model": interpreter.model,
-            "messages": messages,
-            "stream": True,
-            "functions": [function_schema],
+            'model': interpreter.model,
+            'messages': messages,
+            'stream': True,
+            'functions': interpreter.functions_schemas
         }
 
         # Optional inputs
@@ -112,10 +121,9 @@ def setup_openai_coding_llm(interpreter):
 
         response = litellm.completion(**params)
 
+        # Initialize empty arguments dictionary
+        arguments = {}
         accumulated_deltas = {}
-        language = None
-        code = ""
-
         for chunk in response:
             if interpreter.debug_mode:
                 print("Chunk from LLM", chunk)
@@ -135,70 +143,23 @@ def setup_openai_coding_llm(interpreter):
             if "content" in delta and delta["content"]:
                 yield {"message": delta["content"]}
 
-            if (
-                "function_call" in accumulated_deltas
-                and "arguments" in accumulated_deltas["function_call"]
-            ):
-                if (
-                    "name" in accumulated_deltas["function_call"]
-                    and accumulated_deltas["function_call"]["name"] == "execute"
-                ):
-                    arguments = accumulated_deltas["function_call"]["arguments"]
-                    arguments = parse_partial_json(arguments)
+            if "function_call" in accumulated_deltas and "arguments" in accumulated_deltas["function_call"]:
+                partial_arguments = parse_partial_json(accumulated_deltas["function_call"]["arguments"])
+                if partial_arguments:
+                    arguments.update(partial_arguments)  # Update the arguments dictionary with new values
 
-                    if arguments:
-                        if (
-                            language is None
-                            and "language" in arguments
-                            and "code"
-                            in arguments  # <- This ensures we're *finished* typing language, as opposed to partially done
-                            and arguments["language"]
-                        ):
-                            language = arguments["language"]
-                            yield {"language": language}
+        # Fetch current function schema based on the function name
+        current_schema = next(
+            (c for c in interpreter.functions_schemas if c['name'] == accumulated_deltas.get('function_call', {}).get('name')),
+            None
+        )
 
-                        if language is not None and "code" in arguments:
-                            # Calculate the delta (new characters only)
-                            code_delta = arguments["code"][len(code) :]
-                            # Update the code
-                            code = arguments["code"]
-                            # Yield the delta
-                            if code_delta:
-                                yield {"code": code_delta}
-                    else:
-                        if interpreter.debug_mode:
-                            print("Arguments not a dict.")
+        if current_schema is not None:
+            # Check if all required keys are present
+            if all(key in arguments for key in current_schema['parameters']['required']):
 
-                # 3.5 REALLY likes to halucinate a function named `python` and you can't really fix that, it seems.
-                # We just need to deal with it.
-                elif (
-                    "name" in accumulated_deltas["function_call"]
-                    and accumulated_deltas["function_call"]["name"] == "python"
-                ):
-                    if interpreter.debug_mode:
-                        print("Got direct python call")
-                    if language is None:
-                        language = "python"
-                        yield {"language": language}
-
-                    if language is not None:
-                        # Pull the code string straight out of the "arguments" string
-                        code_delta = accumulated_deltas["function_call"]["arguments"][
-                            len(code) :
-                        ]
-                        # Update the code
-                        code = accumulated_deltas["function_call"]["arguments"]
-                        # Yield the delta
-                        if code_delta:
-                            yield {"code": code_delta}
-
-                else:
-                    # If name exists and it's not "execute" or "python", who knows what's going on.
-                    if "name" in accumulated_deltas["function_call"]:
-                        print(
-                            "Encountered an unexpected function call: ",
-                            accumulated_deltas["function_call"],
-                            "\nPlease open an issue and provide the above info at: https://github.com/KillianLucas/open-interpreter",
-                        )
+                # Yield each argument individually
+                for key, value in arguments.items():
+                    yield {key: value}
 
     return coding_llm
