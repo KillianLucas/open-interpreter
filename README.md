@@ -370,6 +370,25 @@ pip install fastapi uvicorn
 uvicorn server:app --reload
 ```
 
+## Docker
+
+You can run Open Interpreter in a container image.
+
+- Example [docker-compose](docker-compose.yaml).
+- Example environment file [.env.example](.env.example).
+
+Build:
+
+```shell
+docker build -t interpreter .
+```
+
+Run:
+
+```shell
+docker run --gpus all --runtime nvidia -v /path/to/your/models:/root/.local/share/Open Interpreter/models:cached -v /path/to/your/docs:/data -it interpreter
+```
+
 ## Safety Notice
 
 Since generated code is executed in your local environment, it can interact with your files and system settings, potentially leading to unexpected outcomes like data loss or security risks.
